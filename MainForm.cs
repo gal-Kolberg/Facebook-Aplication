@@ -1,68 +1,43 @@
 ﻿using System;
-using System.IO;
-using System.Collections.Generic;
 using System.Windows.Forms;
+using System.Threading;
+using System.Drawing;
 using FacebookApplicationLogic;
+using FacebookWrapper;
 
 namespace FacebookApplicationUI
 {
-    public partial class MainForm : Form
+    public partial class MainForm : Form, IDanceable
     {
         private AppLogic AppLogic { get; set; }
 
-        private PictureToAsciiSettings AsciiSettingsForm { get; set; }
+        private PictureToAsciiForm PictureToAsciiForm { get; set; }
 
-        private WayPointSelection WayPointSelectionForm { get; set; }
+        private CheckInToRouteForm CheckInToRouteForm { get; set; }
+
+        public event Action InitilizeMainForm;
+
+        private string AppName { get; set; }
+
+        private Dancer Dancer { get; set; }
+
+        private bool PackageClicked { get; set; }
 
         public MainForm()
         {
             InitializeComponent();
-        }
+            AppLogic = new AppLogic();
+            AppName = "aceBook D&G app";
+            PackageClicked = false;
+            FacebookService.s_CollectionLimit = 100;
+            Dancer = new Dancer();
+            PictureToAsciiForm = new PictureToAsciiForm();
+            CheckInToRouteForm = new CheckInToRouteForm();
 
-        private void loginButton_Clicked(object sender, EventArgs e)
-        {
-            try
-            {
-                const bool v_EnalbleAllButtons = true;
-
-                AppLogic = new AppLogic();
-
-                WayPointSelectionForm = new WayPointSelection(AppLogic.CheckInRoute.FetchAllLocations());
-                ProfilePictureBox.Image = AppLogic.FetchProfilePicture();
-                makeEnabledDisableClient(v_EnalbleAllButtons);
-                LastPostTextBox.Text = AppLogic.FetchLastPost();
-                fetchCheckInListBoxes();
-
-                AsciiSettingsForm = new PictureToAsciiSettings(AppLogic.ImageHight, AppLogic.ImageWidth);
-                SaveFileDialog.FileName = "ProfileToAscii.txt";
-
-                LoginButton.Click -= loginButton_Clicked;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message);
-            }
-        }
-
-        private void fetchCheckInListBoxes()
-        {
-            const int k_MaxNumberOfStops = 9;
-            List<string> userLocations = AppLogic.CheckInRoute.FetchAllLocations();
-
-            OriginComboBox.Items.Clear();
-            DestinationComboBox.Items.Clear();
-            NumberOfStopsComboBox.Items.Clear();
-
-            foreach (string locationString in userLocations)
-            {
-                OriginComboBox.Items.AddRange(new object[] { locationString });
-                DestinationComboBox.Items.AddRange(new object[] { locationString });
-            }
-
-            for (int i = 0; i <= k_MaxNumberOfStops; i++)
-            {
-                NumberOfStopsComboBox.Items.AddRange(new object[] { i });
-            }
+            InitilizeMainForm += AppLogic.Login;
+            InitilizeMainForm += fetchProfilePicture;
+            InitilizeMainForm += fetchLastPost;
+            InitilizeMainForm += addUserNotifiers;
         }
 
         private void makeEnabledDisableClient(bool i_EnableOfDisableButton)
@@ -73,186 +48,195 @@ namespace FacebookApplicationUI
             GroupsLinkLable.Enabled = i_EnableOfDisableButton;
             LikedPages.Enabled = i_EnableOfDisableButton;
             GroupsLinkLable.Enabled = i_EnableOfDisableButton;
-            PictureToAsciiButton.Enabled = i_EnableOfDisableButton;
-            PictureToAsciiSettingsButton.Enabled = i_EnableOfDisableButton;
             EventsLinkLabel.Enabled = i_EnableOfDisableButton;
-            OriginComboBox.Enabled = i_EnableOfDisableButton;
-            DestinationComboBox.Enabled = i_EnableOfDisableButton;
-            NumberOfStopsComboBox.Enabled = i_EnableOfDisableButton;
+            PictureToAsciiButton.Enabled = i_EnableOfDisableButton;
             CheckInToRouteButton.Enabled = i_EnableOfDisableButton;
-            SelectWayPointButton.Enabled = i_EnableOfDisableButton;
+            LogoutButton.Enabled = i_EnableOfDisableButton;
+            SortByComboBox.Enabled = i_EnableOfDisableButton;
+            DanceButton.Enabled = i_EnableOfDisableButton;
+            SortFriednsByLabel.Enabled = i_EnableOfDisableButton;
         }
 
-        private void FriendsLinkLabel_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        private void addRemoveButtonsColor()
         {
-            FriendsTextBox.Text = AppLogic.FetchFriends();
+            CheckInToRouteButton.BackColor = CheckInToRouteButton.BackColor == Color.LightGreen ? Color.LightGray : Color.LightGreen;
+            PictureToAsciiButton.BackColor = PictureToAsciiButton.BackColor == Color.Violet ? Color.LightGray : Color.Violet;
         }
 
-        private void LikedPages_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        private void LoginButton_Click(object sender, EventArgs e)
         {
-            LikedPagesTextBox.Text = AppLogic.FetchLikedPages();
+            try
+            {
+                Thread mainFormInitializer = new Thread(InitilizeMainForm.Invoke);
+                PackageSelectButton.Enabled = true;
+                mainFormInitializer.SetApartmentState(ApartmentState.STA);
+                mainFormInitializer.Start();
+                LoginButton.Click -= LoginButton_Click;
+                PackageSelectButton.Enabled = true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
         }
 
-        private void GroupsLinkLable_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        private void addUserNotifiers()
         {
-            GroupsTextBox.Text = AppLogic.FetchGrourps();
+            AppLogic.LoggedInUser.NotifyFeatures += CheckInToRouteForm.FeatureAccess;
+            AppLogic.LoggedInUser.NotifyFeatures += PictureToAsciiForm.FeatureAccess;
         }
 
-        private void CoverPhotoLinkLabel_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
-        {
-            FetchCoverPictureBox.Image = AppLogic.FetchCoverPhoto();
+        private void fetchProfilePicture()
+        { 
+            ProfilePictureBox.Invoke(new Action(() => ProfilePictureBox.Image = AppLogic.FetchProfilePicture()));
         }
 
-        private void PictureToAsciiSettingsButton_Click(object sender, EventArgs e)
+        private void fetchLastPost()
         {
-            AsciiSettingsForm.ShowDialog();
+            LastPostTextBox.Invoke(new Action(() => LastPostTextBox.Text = AppLogic.FetchLastPost()));
+        }
+
+        private void fetchCoverPhoto()
+        {
+            LikedPagesTextBox.Invoke(new Action(() => CoverPhotoPictureBox.Image = AppLogic.FetchCoverPhoto()));
+        }
+
+        private void FetchCoverPhotoLinkLabel_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            new Thread(fetchCoverPhoto).Start();
+        }
+
+        private void fetchLikedPages()
+        {
+            LikedPagesTextBox.Invoke(new Action(() => LikedPagesTextBox.Text = AppLogic.FetchLikedPages()));
+        }
+
+        private void LikedPages_LinkClicked_1(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            new Thread(fetchLikedPages).Start();
+        }
+
+        private void fetchGroups()
+        {
+            GroupsTextBox.Invoke(new Action(() => GroupsTextBox.Text = AppLogic.FetchGrourps()));
+        }
+
+        private void GroupsLinkLable_LinkClicked_1(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            new Thread(fetchGroups).Start();
+        }
+
+        private void fetchFriends()
+        {
+            FriendsTextBox.Invoke(new Action(() => FriendsTextBox.Text = AppLogic.FetchFriends()));
+        }
+
+        private void FecthFriendsLinkLabel_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            new Thread(fetchFriends).Start();
+        }
+
+        private void fetchEvents()
+        {
+            EventTextBox.Invoke(new Action(() => EventTextBox.Text = AppLogic.FetchEvents()));
+        }
+
+        private void EventsLinkLabel_LinkClicked_1(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            new Thread(fetchEvents).Start();
         }
 
         private void PictureToAsciiButton_Click(object sender, EventArgs e)
         {
-            AppLogic.InitPicToAscii(ProfilePictureBox.Image);
-            AppLogic.SetPictureToAsciiSettings(AsciiSettingsForm.ImageHight, AsciiSettingsForm.ImageWidth, AsciiSettingsForm.IndexCharsChoosen, AsciiSettingsForm.BlackToWhite);
-            AsciiStringTextBox.Text = AppLogic.PicToAscii.MakeToAscii();
-            SaveToFileButton.Enabled = true;
-        }
+            PictureToAsciiForm.InitForm(ProfilePictureBox.Image.Height, ProfilePictureBox.Image.Width, ProfilePictureBox.Image);
 
-        private void SaveToFileButton_Click(object sender, EventArgs e)
-        {
-            if (SaveFileDialog.ShowDialog() == DialogResult.OK)
-            { 
-                using (StreamWriter outputFile = new StreamWriter(SaveFileDialog.FileName))
-                {
-                    outputFile.Write(AsciiStringTextBox.Text);
-                }
-            }
-        }
-
-        private void EventsLinkLabel_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
-        {
-            EventTextBox.Text = AppLogic.FetchEvents();
+            PictureToAsciiForm.ShowDialog();
         }
 
         private void CheckInToRouteButton_Click(object sender, EventArgs e)
         {
-            const int k_IndexNotSelected = -1;
-            int originIndex = OriginComboBox.SelectedIndex;
-            int destinationIndex = DestinationComboBox.SelectedIndex;
-            int waypointSelected = NumberOfStopsComboBox.SelectedIndex;
-            string origin = string.Empty;
-            string destination = string.Empty;
-            string url = string.Empty;
+            CheckInToRouteForm.InitForm(AppLogic.LoggedInUser.User.Checkins);
 
-            if (originIndex == k_IndexNotSelected || destinationIndex == k_IndexNotSelected)
-            {
-                string msg = string.Format(
-                    "Because no origin or destination values where choosen your route will be " +
-                    "set to the default value of:{0} Origin - first item, destenation - last item",
-                    Environment.NewLine);
-
-                if (waypointSelected == 0) 
-                {
-                    msg += ", with no stops.";
-                }
-
-                MessageBox.Show(msg);
-                originIndex = 0;
-                destinationIndex = DestinationComboBox.Items.Count - 1;
-            }
-
-            origin = string.Format(
-                "{0},{1}",
-                AppLogic.CheckInRoute.UserCheckIns[originIndex].Place.Location.Latitude,
-                AppLogic.CheckInRoute.UserCheckIns[originIndex].Place.Location.Longitude);
-
-            destination = string.Format(
-                "{0},{1}",
-                AppLogic.CheckInRoute.UserCheckIns[destinationIndex].Place.Location.Latitude,
-                AppLogic.CheckInRoute.UserCheckIns[destinationIndex].Place.Location.Longitude);
-
-            url = AppLogic.CheckInRoute.GetCheckInRoutes(origin, destination);
-
-            System.Diagnostics.Process.Start(url);
+            CheckInToRouteForm.ShowDialog();
         }
 
-        private void SelectWayPointButton_Click(object sender, EventArgs e)
-        {
-            int numberOfWayPoints = NumberOfStopsComboBox.SelectedIndex;
-            int selectedWayPointIndex;
-            const int k_NumberOfMininalWayPoints = 0;
-
-            AppLogic.CheckInRoute.EmptySelectedWayPointList();
-            WayPointSelectionForm.UpdateButtonText("Next");
-
-            if (numberOfWayPoints > k_NumberOfMininalWayPoints)
-            {
-                for (int i = 0; i < numberOfWayPoints; i++)
-                {
-                    if (i == numberOfWayPoints - 1) 
-                    {
-                        WayPointSelectionForm.UpdateButtonText("Finish");
-                    }
-
-                    WayPointSelectionForm.UpdateLabelText(i + 1);
-                    WayPointSelectionForm.ShowDialog();
-                    selectedWayPointIndex = WayPointSelectionForm.LastSelected;
-                    AppLogic.CheckInRoute.AddToUserSelectedWayPoints(selectedWayPointIndex);
-                }
-            }
-            else
-            {
-                MessageBox.Show("You need to select at least 1 stop.");
-            }
-        }
-
-        private void LogoutButton_Click(object sender, EventArgs e)
+        private void LogoutButton_Click_1(object sender, EventArgs e)
         {
             const bool v_DisableAllButton = false;
-            TextBox tempBox;
-            TabPage tempTabPage;
-            TabControl tempTabControl;
-            PictureBox tempPictureBox;
-            ComboBox tempComboBox;
 
             AppLogic.Logout();
+            cleanClient();
             makeEnabledDisableClient(v_DisableAllButton);
-            SaveToFileButton.Enabled = false;
-            LoginButton.Click += loginButton_Clicked;
+            LoginButton.Click += LoginButton_Click;
+            addRemoveButtonsColor();
+            PackageSelectButton.Enabled = false;
+        }
 
-            foreach (Control mainFormControl in Controls)
+        private void cleanClient()
+        {
+            PictureBox currentPictureBox;
+            ProfilePictureBox.Image = null;
+            CoverPhotoPictureBox.Image = null;
+
+            foreach (Control control in Controls) 
             {
-                tempTabControl = mainFormControl as TabControl;
+                currentPictureBox = control as PictureBox;
 
-                if (tempTabControl != null)
+                if (control is TextBox)
                 {
-                    foreach (Control tabControl in tempTabControl.Controls)
-                    {
-                        tempTabPage = tabControl as TabPage;
-
-                        if (tempTabPage != null)
-                        {
-                            foreach (Control insideTabControl in tempTabPage.Controls)
-                            {
-                                tempBox = insideTabControl as TextBox;
-                                tempPictureBox = insideTabControl as PictureBox;
-                                tempComboBox = insideTabControl as ComboBox;
-
-                                if (tempBox != null)
-                                {
-                                    tempBox.Text = string.Empty;
-                                }
-                                else if (tempPictureBox != null)
-                                {
-                                    tempPictureBox.Image = null;
-                                }
-                                else if (tempComboBox != null) 
-                                {
-                                    tempComboBox.Text = string.Empty;
-                                }
-                            }
-                        }
-                    }
+                    control.Text = string.Empty;
+                }
+                else if (currentPictureBox != null)
+                {
+                    currentPictureBox.Image = null;
                 }
             }
+        }
+
+        private void nameAppAccordingToUserType()
+        {
+            switch (AppLogic.LoggedInUser.eUserType)
+            {
+                case eUserType.eTrialUser:
+                    Text = string.Format("{0}{1}", AppName, " - Trial User");
+                    break;
+                case eUserType.eBusinessUser:
+                    Text = string.Format("{0}{1}", AppName, " - Business User");
+                    break;
+                case eUserType.ePremiumUser:
+                    Text = string.Format("{0}{1}", AppName, " - Premium User");
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        private void PackageSelectButton_Click(object sender, EventArgs e)
+        {
+            const bool v_EnalbleAllButtons = true;
+            PackageForm packageForm = new PackageForm();
+
+            packageForm.ShowDialog();
+            AppLogic.LoggedInUser.ChangeUserType(packageForm.UserChoosenType);
+            makeEnabledDisableClient(v_EnalbleAllButtons);
+            nameAppAccordingToUserType();
+
+            if (PackageClicked == false)
+            {
+                addRemoveButtonsColor();
+                PackageClicked = true;
+            }
+        }
+
+        private void DanceButton_Click(object sender, EventArgs e)
+        {
+            Dancer.MakeDance(this);
+        }
+
+        private void SortByComboBox_SelectionChangeCommitted(object sender, EventArgs e)
+        {
+            eSortBy sortBy = (eSortBy)SortByComboBox.SelectedIndex;
+            FriendsTextBox.Text = AppLogic.SortBy(sortBy);
         }
     }
 }

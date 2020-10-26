@@ -9,7 +9,11 @@ namespace FacebookApplicationLogic
 
         public string LastGivenRoute { get; private set; }
 
+        public string[] LastGivenRoute1 { get; private set; }
+
         private List<Checkin> UserSelectedWayPoints { get; set; }
+
+        private CheckInAdapter CheckInProxy { get; set; }
 
         private const string k_BaseUrl = @"https://www.google.com/maps/dir/?api=1&origin={0}&destination={1}&travelmode=driving";
 
@@ -18,6 +22,7 @@ namespace FacebookApplicationLogic
         public CheckInRoute(FacebookObjectCollection<Checkin> i_Checkins)
         {
             UserCheckIns = i_Checkins;
+            CheckInProxy = new CheckInAdapter(i_Checkins);
             UserSelectedWayPoints = new List<Checkin>();
         }
 

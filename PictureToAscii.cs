@@ -5,12 +5,6 @@ namespace FacebookApplicationLogic
 {
     public class PictureToAscii
     {
-        private string AsciiValues { get; set; }
-
-        private int[,] FinalImage { get; set; }
-
-        private int[,] GrayScaleValues { get; set; }
-
         public Bitmap InputImage { get; set; }
 
         public bool BlackToWhite { get; set; }
@@ -18,6 +12,12 @@ namespace FacebookApplicationLogic
         public int AsciiHeight { get; set; }
 
         public int AsciiWidth { get; set; }
+
+        private string AsciiValues { get; set; }
+
+        private int[,] FinalImage { get; set; }
+
+        private int[,] GrayScaleValues { get; set; }
 
         private readonly string[] r_StringCharOptions = 
             {
